@@ -648,19 +648,85 @@
 
                         return {
                             date: String(dateValue).trim(),
-                            production: parseFloat(productionValue) || 0
+                            production: parseFloat(productionValue) || 0,
+                            hasDate: dateValue && String(dateValue).trim().length > 0
                         };
                     });
 
                     console.log('Mapped data (first 3):', productionData.slice(0, 3));
 
+                    // Sprawdź czy są wiersze bez daty
+                    const rowsWithoutDate = productionData.filter(d => !d.hasDate).length;
+                    if (rowsWithoutDate > 0) {
+                        console.warn(`⚠️ Znaleziono ${rowsWithoutDate} wierszy bez daty - generuję automatyczne daty!`);
+                    }
+
                     // Filtrowanie pustych wierszy - akceptuj również 0
-                    productionData = productionData.filter(d => d.date && d.date.length > 0 && !isNaN(d.production));
+                    productionData = productionData.filter(d => !isNaN(d.production));
+
+                    // Generuj automatyczne daty dla wierszy bez daty
+                    let autoDateCounter = 0;
+                    const today = new Date();
+                    productionData = productionData.map((d, index) => {
+                        if (!d.hasDate || d.date.length === 0) {
+                            // Generuj datę: dzisiaj - (długość_tablicy - index) dni
+                            const autoDate = new Date(today);
+                            autoDate.setDate(today.getDate() - (productionData.length - index - 1));
+                            d.date = autoDate.toISOString().split('T')[0];
+                            autoDateCounter++;
+                        }
+                        delete d.hasDate; // Usuń tymczasowe pole
+                        return d;
+                    });
+
+                    if (autoDateCounter > 0) {
+                        console.log(`✅ Wygenerowano ${autoDateCounter} automatycznych dat`);
+                    }
 
                     console.log('Filtered data length:', productionData.length);
 
                     // Sortowanie po dacie
                     productionData.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+                    // Wypełnij brakujące dni (luki w datach) z produkcją 0 kWh
+                    if (productionData.length > 1) {
+                        const filledData = [];
+
+                        for (let i = 0; i < productionData.length; i++) {
+                            filledData.push(productionData[i]);
+
+                            // Sprawdź czy jest następny dzień
+                            if (i < productionData.length - 1) {
+                                const currentDate = new Date(productionData[i].date);
+                                const nextDate = new Date(productionData[i + 1].date);
+
+                                // Oblicz różnicę w dniach
+                                const diffTime = nextDate - currentDate;
+                                const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+                                // Jeśli różnica > 1 dzień, wypełnij brakujące dni
+                                if (diffDays > 1) {
+                                    console.log(`📅 Znaleziono lukę ${diffDays} dni między ${productionData[i].date} a ${productionData[i + 1].date}`);
+
+                                    for (let j = 1; j < diffDays; j++) {
+                                        const missingDate = new Date(currentDate);
+                                        missingDate.setDate(currentDate.getDate() + j);
+
+                                        filledData.push({
+                                            date: missingDate.toISOString().split('T')[0],
+                                            production: 0
+                                        });
+                                    }
+                                }
+                            }
+                        }
+
+                        const missingDaysCount = filledData.length - productionData.length;
+                        if (missingDaysCount > 0) {
+                            console.log(`✅ Dodano ${missingDaysCount} brakujących dni z produkcją 0 kWh`);
+                            productionData = filledData;
+                        }
+                    }
 
                     if (productionData.length > 0) {
                         // Generuj wykresy TYLKO dla rzeczywistych danych z CSV
@@ -693,7 +759,18 @@
                         const nominalPower = 12; // kW (z pliku)
                         const scaledPower = nominalPower * (pvScaling / 100);
 
-                        alert(`✅ Wczytano ${productionData.length} dni danych produkcji energii!\n\n` +
+                        // Komunikat o automatycznych datach (jeśli były generowane)
+                        const autoDateInfo = autoDateCounter > 0
+                            ? `\n⚠️ Uwaga: ${autoDateCounter} wierszy nie miało daty - wygenerowano automatycznie.`
+                            : '';
+
+                        // Komunikat o wypełnionych brakujących dniach (jeśli były luki)
+                        const missingDaysCount = productionData.length - results.data.filter(r => !isNaN(parseFloat(r['daily-production'] || r['Daily-Production'] || r['Produkcja-dziś(kWh)'] || r['produkcja'] || '0'))).length - autoDateCounter;
+                        const missingDaysInfo = missingDaysCount > 0
+                            ? `\n📅 Uzupełniono ${missingDaysCount} brakujących dni (luki w datach) z produkcją 0 kWh.`
+                            : '';
+
+                        alert(`✅ Wczytano ${productionData.length} dni danych produkcji energii!${autoDateInfo}${missingDaysInfo}\n` +
                               `Okres: ${productionData[0].date} - ${productionData[productionData.length-1].date}\n` +
                               `Czas trwania: ${periodYears.toFixed(2)} lat\n\n` +
                               `Akumulator:\n` +

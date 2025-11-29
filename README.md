@@ -43,6 +43,10 @@ time,daily-production
 - Data: `time`, `Time`, `data`
 - Produkcja: `daily-production`, `Daily-Production`, `Produkcja-dziś(kWh)`
 
+⚠️ **Uwaga:** 
+- Jeśli w pliku CSV brakuje kolumny z datą lub niektóre wiersze nie mają daty, aplikacja automatycznie wygeneruje daty (dni wstecz od dzisiaj) i wyświetli ostrzeżenie.
+- Jeśli w datach są **luki** (np. jest 2025-01-01, potem 2025-01-05), aplikacja **automatycznie wypełni** brakujące dni (2, 3, 4) z produkcją **0 kWh**.
+
 **Aby wczytać własny plik:** Kliknij przycisk **"📁 Wybierz plik CSV"** w aplikacji.
 
 ### Krok 3: Skonfiguruj zbiornik
@@ -340,6 +344,46 @@ Aplikacja wyświetla:
 - Służą jako przykład do eksperymentowania z kalkulatorem
 - Możesz je zastąpić swoimi danymi w dowolnej chwili
 
+### ❓ Co jeśli w moim pliku CSV brakuje dat?
+**Odpowiedź:**
+- **Nie ma problemu!** Aplikacja automatycznie wygeneruje daty
+- Daty będą liczone wstecz od dzisiaj (dziś - N dni)
+- Zobaczysz ostrzeżenie: "⚠️ Uwaga: X wierszy nie miało daty - wygenerowano automatycznie"
+- W konsoli (F12) zobaczysz szczegóły: ile dat zostało wygenerowanych
+- Wykresy będą działać normalnie, ale okresy mogą być nieprecyzyjne
+
+**Przykład:**
+```csv
+daily-production
+10.5
+12.3
+8.7
+```
+→ Aplikacja wygeneruje daty: dzisiaj-2, dzisiaj-1, dzisiaj
+
+### ❓ Co jeśli w moim pliku są luki w datach (np. brakuje niektórych dni)?
+**Odpowiedź:**
+- **Aplikacja automatycznie wypełni luki!**
+- Brakujące dni zostaną dodane z produkcją **0 kWh**
+- Zobaczysz komunikat: "📅 Uzupełniono X brakujących dni (luki w datach) z produkcją 0 kWh"
+- W konsoli (F12) zobaczysz szczegóły: które dni były brakujące
+
+**Przykład:**
+```csv
+time,daily-production
+2025-01-01,10.5
+2025-01-05,12.3
+```
+→ Aplikacja doda:
+- 2025-01-02: 0 kWh
+- 2025-01-03: 0 kWh  
+- 2025-01-04: 0 kWh
+
+**Dlaczego to ważne?**
+- Symulacja musi mieć ciągłe dni (bez przerw)
+- Dni bez produkcji = tylko straty cieplne z akumulatora
+- Realistyczna symulacja (np. awaria, chmury, śnieg na panelach)
+
 ## 📊 Przykłady praktyczne
 
 ### Przykład 1: Mały domowy akumulator
@@ -418,6 +462,13 @@ Pojemność: ~350 kWh
 1. Sprawdź jednostki w pliku CSV (powinny być kWh, nie Wh)
 2. Sprawdź czy skalowanie PV = 100%
 3. Sprawdź czy wymiary są w metrach, nie centymetrach
+
+### Problem: "Widzę ostrzeżenie o wygenerowanych datach"
+**Rozwiązanie:**
+- To normalne jeśli Twój plik CSV nie ma kolumny z datami
+- Aplikacja automatycznie wygenerowała daty (dni wstecz od dzisiaj)
+- Wykresy będą działać, ale okresy mogą być nieprecyzyjne
+- **Rekomendacja:** Dodaj kolumnę `time` z datami do pliku CSV dla dokładniejszych wyników
 
 ## 📝 Licencja
 
