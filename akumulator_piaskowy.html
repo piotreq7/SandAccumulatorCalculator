@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Akumulator Piaskowy - Zarządzanie Energią</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .controls {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .control-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        input[type="number"], input[type="range"], select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        input[type="number"]:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        input[type="range"] {
+            padding: 5px;
+        }
+
+
+        .button-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 15px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: white;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+
+        button.success {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .charts-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .chart-wrapper {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+
+        .chart-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        canvas {
+            max-height: 400px;
+        }
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+
+        .info-box h3 {
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+
+        .info-box p {
+            color: #555;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+
+
+            .button-group {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚡ Akumulator Piaskowy</h1>
+        <p class="subtitle">System zarządzania energią z fotowoltaiki</p>
+
+        <div class="info-box">
+            <h3>ℹ️ O systemie</h3>
+            <p>Akumulator piaskowy to system przechowywania energii termicznej. Energia z paneli fotowoltaicznych jest przekształcana w ciepło i magazynowana w piasku, który może osiągnąć temperatury do 600°C. System może następnie oddawać ciepło do ogrzewania lub produkcji energii elektrycznej.</p>
+            <p><strong>Symulacja rozpoczyna się od pustego akumulatora (0 kWh, 20°C)</strong> i stopniowo gromadzi energię z instalacji PV. System uwzględnia:</p>
+            <ul style="margin: 5px 0 10px 20px; line-height: 1.6;">
+                <li><strong>Kształt zbiornika:</strong> prostopadłościan lub walec (różne obliczenia powierzchni i strat)</li>
+                <li>Straty cieplne przez izolację (im grubsza, tym mniejsze)</li>
+                <li>Gradient temperatury w piasku (centrum → ścianki)</li>
+                <li><strong>Skalowanie produkcji PV</strong> (100% = pełna moc z pliku, 50% = połowa produkcji)</li>
+            </ul>
+            <p><strong>💡 Aby rozpocząć:</strong> Kliknij przycisk <strong>"📁 Wybierz plik CSV"</strong> i wybierz plik z danymi produkcji energii. Plik powinien mieć kolumny: <code>time</code> (data) i <code>daily-production</code> (produkcja w kWh).</p>
+            <p style="margin-top: 10px; font-size: 0.9em;"><strong>🔧 Debug:</strong> Jeśli masz problem z wczytaniem, otwórz konsolę przeglądarki (F12) aby zobaczyć szczegóły parsowania.</p>
+        </div>
+
+        <div class="info-box" style="background: #fff3e0; border-left-color: #ff9800;">
+            <h3 style="color: #e65100;">🔬 Parametry fizyczne materiałów</h3>
+            <p><strong>Piasek (medium magazynujące):</strong></p>
+            <ul style="margin: 5px 0 10px 20px; line-height: 1.8;">
+                <li>Przewodność cieplna λ: <strong>0.27 W/(m·K)</strong> (piasek suchy)</li>
+                <li>Gęstość: 1600 kg/m³</li>
+                <li>Ciepło właściwe: 0.835 kJ/(kg·K)</li>
+                <li>Zakres temperatur: 20°C - <strong>max (konfigurowalna, domyślnie 600°C)</strong></li>
+                <li><strong>Gradient temperatury:</strong> centrum (max) → średnia → ścianki (min, przed izolacją)</li>
+            </ul>
+            <p><strong>Izolacja zewnętrzna (wełna mineralna):</strong></p>
+            <ul style="margin: 5px 0 10px 20px; line-height: 1.8;">
+                <li>Przewodność cieplna λ: <strong>0.04 W/(m·K)</strong></li>
+                <li>Grubość: konfigurowana (domyślnie 200 mm)</li>
+                <li><strong>Izolacja podstawy: 4× grubsza</strong> (konstrukcyjna, np. bloczki betonowe nośne)</li>
+                <li>Efektywność: ~6.75× lepsza izolacja niż piasek</li>
+            </ul>
+            <p><strong>Warunki brzegowe:</strong></p>
+            <ul style="margin: 5px 0 10px 20px; line-height: 1.8;">
+                <li>Temperatura otoczenia: <strong>20°C</strong> (stała)</li>
+                <li>Model: przewodzenie ciepła przez warstwy szeregowo</li>
+                <li>Średnia droga ciepła w piasku: (L+W+H)/6 [m]</li>
+                <li><strong>Rozkład temp. w piasku:</strong> paraboliczny (T_avg = (2×T_center + T_wall)/3)</li>
+            </ul>
+            <p style="margin-top: 10px; font-size: 0.9em;"><strong>📊 Model strat:</strong> Q = ΔT / (R_piasek + R_izolacja), gdzie R = d/(λ·A). Gradient temp. powoduje że średnia temp. piasku jest niższa niż w centrum.</p>
+        </div>
+
+
+
+        <div class="controls">
+            <h2 style="margin-bottom: 20px; color: #333;">⚙️ Konfiguracja systemu</h2>
+
+            <div class="control-row">
+                <div class="control-group">
+                    <label for="tankShape">Kształt zbiornika:</label>
+                    <select id="tankShape" style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 1em;">
+                        <option value="box">Prostopadłościan</option>
+                        <option value="cylinder">Walec</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="boxDimensions" class="control-row">
+                <div class="control-group">
+                    <label for="tankLength">Długość zbiornika (m):</label>
+                    <input type="number" id="tankLength" value="1" min="0.1" max="50" step="0.1">
+                </div>
+
+                <div class="control-group">
+                    <label for="tankWidth">Szerokość zbiornika (m):</label>
+                    <input type="number" id="tankWidth" value="1" min="0.1" max="50" step="0.1">
+                </div>
+
+                <div class="control-group">
+                    <label for="tankHeight">Wysokość zbiornika (m):</label>
+                    <input type="number" id="tankHeight" value="1" min="0.1" max="50" step="0.1">
+                </div>
+            </div>
+
+            <div id="cylinderDimensions" class="control-row" style="display: none;">
+                <div class="control-group">
+                    <label for="cylinderRadius">Promień walca (m):</label>
+                    <input type="number" id="cylinderRadius" value="0.564" min="0.1" max="50" step="0.01">
+                    <small style="display: block; color: #666; margin-top: 5px;">Promień 0.564m ≈ objętość 1m³ przy wys. 1m</small>
+                </div>
+
+                <div class="control-group">
+                    <label for="cylinderHeight">Wysokość walca (m):</label>
+                    <input type="number" id="cylinderHeight" value="1" min="0.1" max="50" step="0.1">
+                </div>
+            </div>
+
+            <div class="control-row">
+                <div class="control-group">
+                    <label for="insulationThickness">Grubość izolacji (mm):</label>
+                    <input type="number" id="insulationThickness" value="200" min="0" max="1000" step="10">
+                    <small style="display: block; color: #666; margin-top: 5px;">Uwaga: izolacja podstawy będzie 4× grubsza (konstrukcyjna, np. bloczki betonowe nośne)</small>
+                </div>
+
+                <div class="control-group">
+                    <label for="maxSandTemp">Maksymalna temperatura piasku (°C):</label>
+                    <input type="number" id="maxSandTemp" value="600" min="100" max="1000" step="50">
+                    <small style="display: block; color: #666; margin-top: 5px;">Typowo: 500-600°C. Wyższa temp. = większa pojemność, ale trudniejsza realizacja</small>
+                </div>
+            </div>
+
+            <div class="control-row">
+                <div class="control-group">
+                    <label for="pvScaling">Skalowanie produkcji PV (%):</label>
+                    <input type="number" id="pvScaling" value="100" min="0" max="200" step="1">
+                    <small style="display: block; color: #666; margin-top: 5px;">100% = pełna produkcja z pliku. 50% = połowa produkcji.</small>
+                </div>
+            </div>
+
+
+            <h3 style="margin-top: 20px; color: #333; font-size: 1.1em;">🎮 Sterowanie:</h3>
+            <div class="button-group">
+                <button class="success" onclick="document.getElementById('fileInput').click()">📁 Wybierz plik CSV</button>
+            </div>
+            <input type="file" id="fileInput" accept=".csv" style="display: none;" onchange="loadFromFile(event)">
+            <p style="margin-top: 10px; color: #666; font-size: 0.9em;">
+                💡 <strong>Wskazówka:</strong> Użyj przycisku "📁 Wybierz plik CSV" aby wczytać dane z pliku
+            </p>
+        </div>
+
+        <div class="charts-container">
+            <div class="chart-wrapper">
+                <h3 class="chart-title">🔋 Stan akumulatora - cały okres</h3>
+                <canvas id="storageChart"></canvas>
+            </div>
+
+            <div class="chart-wrapper">
+                <h3 class="chart-title">📉 Straty energii przez izolację - cały okres</h3>
+                <canvas id="lossChart"></canvas>
+            </div>
+
+            <div class="chart-wrapper">
+                <h3 class="chart-title">🌡️ Temperatura piasku (centrum, średnia, ścianki) - cały okres</h3>
+                <canvas id="temperatureChart"></canvas>
+            </div>
+
+            <div class="chart-wrapper">
+                <h3 class="chart-title">📈 Produkcja energii dzienna - cały okres</h3>
+                <canvas id="productionChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Dane i zmienne globalne
+        let productionData = [];
+        let storageHistory = [];
+        let temperatureHistory = [];
+        let lossHistory = []; // Historia dziennych strat przez izolację
+        let currentStorage = 0; // Akumulator zaczyna pusty (0 kWh)
+        let currentTemperature = 20; // Temperatura otoczenia (20°C)
+        let tankShape = 'box'; // Kształt: 'box' lub 'cylinder'
+        let tankLength = 1; // Długość zbiornika w metrach (dla prostopadłościanu)
+        let tankWidth = 1; // Szerokość zbiornika w metrach (dla prostopadłościanu)
+        let tankHeight = 1; // Wysokość zbiornika w metrach (dla prostopadłościanu)
+        let cylinderRadius = 0.564; // Promień walca w metrach
+        let cylinderHeight = 1; // Wysokość walca w metrach
+        let maxCapacity = 10000; // Będzie obliczana z wymiarów
+        let insulationThickness = 200; // Grubość izolacji w mm
+        let pvScaling = 100; // Skalowanie produkcji PV w % (100% = pełna moc z pliku)
+        let maxSandTemp = 600; // Maksymalna temperatura piasku w °C
+
+        // Wykresy
+        let productionChart, storageChart, lossChart, temperatureChart;
+
+        // Inicjalizacja
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+            calculateCapacity(); // Oblicz pojemność na starcie
+            updateDisplay();
+            // Nie wczytujemy automatycznie - użytkownik musi wybrać plik CSV
+
+            // Event listener dla wyboru kształtu
+            document.getElementById('tankShape').addEventListener('change', function(e) {
+                tankShape = e.target.value;
+
+                // Pokaż/ukryj odpowiednie pola
+                if (tankShape === 'box') {
+                    document.getElementById('boxDimensions').style.display = 'grid';
+                    document.getElementById('cylinderDimensions').style.display = 'none';
+                } else {
+                    document.getElementById('boxDimensions').style.display = 'none';
+                    document.getElementById('cylinderDimensions').style.display = 'grid';
+                }
+
+                calculateCapacity();
+                if (productionData.length > 0) {
+                    simulateFullPeriod();
+                }
+            });
+
+            // Event listenery dla kontrolek prostopadłościanu
+            document.getElementById('tankLength').addEventListener('change', function(e) {
+                tankLength = parseFloat(e.target.value);
+                calculateCapacity();
+                if (productionData.length > 0) {
+                    simulateFullPeriod();
+                }
+            });
+
+            document.getElementById('tankWidth').addEventListener('change', function(e) {
+                tankWidth = parseFloat(e.target.value);
+                calculateCapacity();
+                if (productionData.length > 0) {
+                    simulateFullPeriod();
+                }
+            });
+
+            document.getElementById('tankHeight').addEventListener('change', function(e) {
+                tankHeight = parseFloat(e.target.value);
+                calculateCapacity();
+                if (productionData.length > 0) {
+                    simulateFullPeriod();
+                }
+            });
+
+            // Event listenery dla wymiarów walca
+            document.getElementById('cylinderRadius').addEventListener('change', function(e) {
+                cylinderRadius = parseFloat(e.target.value);
+                calculateCapacity();
+                if (productionData.length > 0) {
+                    simulateFullPeriod();
+                }
+            });
+
+            document.getElementById('cylinderHeight').addEventListener('change', function(e) {
+                cylinderHeight = parseFloat(e.target.value);
+                calculateCapacity();
+                if (productionData.length > 0) {
+                    simulateFullPeriod();
+                }
+            });
+
+            document.getElementById('insulationThickness').addEventListener('change', function(e) {
+                insulationThickness = parseFloat(e.target.value);
+                if (productionData.length > 0) {
+                    simulateFullPeriod(); // Przelicz symulację z nową grubością
+                }
+            });
+
+            document.getElementById('pvScaling').addEventListener('change', function(e) {
+                pvScaling = parseFloat(e.target.value);
+                if (productionData.length > 0) {
+                    simulateFullPeriod(); // Przelicz symulację z nowym skalowaniem
+                }
+            });
+
+            document.getElementById('maxSandTemp').addEventListener('change', function(e) {
+                maxSandTemp = parseFloat(e.target.value);
+                calculateCapacity(); // Przelicz pojemność z nową temperaturą
+                if (productionData.length > 0) {
+                    simulateFullPeriod(); // Przelicz symulację
+                }
+            });
+        });
+
+        // Obliczanie pojemności akumulatora z wymiarów
+        function calculateCapacity() {
+            // Obliczenie objętości w zależności od kształtu
+            let volume;
+            let dimensions;
+
+            if (tankShape === 'box') {
+                // Prostopadłościan: V = długość × szerokość × wysokość
+                volume = tankLength * tankWidth * tankHeight;
+                dimensions = `${tankLength}m × ${tankWidth}m × ${tankHeight}m`;
+            } else {
+                // Walec: V = π × r² × h
+                volume = Math.PI * cylinderRadius * cylinderRadius * cylinderHeight;
+                dimensions = `⌀${(cylinderRadius*2).toFixed(2)}m × ${cylinderHeight}m (r=${cylinderRadius}m)`;
+            }
+
+            // Parametry fizyczne piasku
+            const sandDensity = 1600; // kg/m³ - gęstość piasku
+            const sandSpecificHeat = 0.835; // kJ/(kg·K) - ciepło właściwe piasku
+            const minTemp = 20; // Temperatura minimalna (otoczenia)
+            const deltaT = maxSandTemp - minTemp; // Różnica temperatur
+
+            // Energia = masa × ciepło właściwe × ΔT
+            const mass = volume * sandDensity; // kg
+            const energyKJ = mass * sandSpecificHeat * deltaT; // kJ
+            maxCapacity = energyKJ / 3600; // kWh (1 kWh = 3600 kJ)
+
+            console.log(`Kształt: ${tankShape === 'box' ? 'Prostopadłościan' : 'Walec'}`);
+            console.log(`Wymiary: ${dimensions}`);
+            console.log(`Objętość: ${volume.toFixed(2)} m³`);
+            console.log(`Zakres temperatur: ${minTemp}°C - ${maxSandTemp}°C (ΔT = ${deltaT}K)`);
+            console.log(`Pojemność: ${maxCapacity.toFixed(2)} kWh`);
+        }
+
+        // Inicjalizacja wykresów
+        function initCharts() {
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            };
+
+            // Wykres produkcji
+            const ctxProduction = document.getElementById('productionChart').getContext('2d');
+            productionChart = new Chart(ctxProduction, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Produkcja energii (kWh)',
+                        data: [],
+                        backgroundColor: 'rgba(102, 126, 234, 0.6)',
+                        borderColor: 'rgba(102, 126, 234, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: chartOptions
+            });
+
+            // Wykres stanu akumulatora
+            const ctxStorage = document.getElementById('storageChart').getContext('2d');
+            storageChart = new Chart(ctxStorage, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Stan akumulatora (kWh)',
+                        data: [],
+                        backgroundColor: 'rgba(79, 172, 254, 0.2)',
+                        borderColor: 'rgba(79, 172, 254, 1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: chartOptions
+            });
+
+            // Wykres strat energii
+            const ctxLoss = document.getElementById('lossChart').getContext('2d');
+            lossChart = new Chart(ctxLoss, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Straty dzienne (kWh)',
+                        data: [],
+                        backgroundColor: 'rgba(244, 67, 54, 0.6)',
+                        borderColor: 'rgba(244, 67, 54, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: chartOptions
+            });
+
+            // Wykres temperatury (centrum, średnia i przy ściankach)
+            const ctxTemp = document.getElementById('temperatureChart').getContext('2d');
+            temperatureChart = new Chart(ctxTemp, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Temperatura w centrum (°C)',
+                        data: [],
+                        backgroundColor: 'rgba(255, 107, 53, 0.2)',
+                        borderColor: 'rgba(255, 107, 53, 1)',
+                        borderWidth: 3,
+                        fill: false,
+                        tension: 0.4
+                    }, {
+                        label: 'Średnia temperatura piasku (°C)',
+                        data: [],
+                        backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                        borderColor: 'rgba(76, 175, 80, 1)',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.4,
+                        borderDash: [5, 5]
+                    }, {
+                        label: 'Temperatura przy ściankach (°C)',
+                        data: [],
+                        backgroundColor: 'rgba(33, 150, 243, 0.2)',
+                        borderColor: 'rgba(33, 150, 243, 1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        borderDash: [10, 5]
+                    }]
+                },
+                options: chartOptions
+            });
+        }
+
+
+        // Wczytanie pliku z dysku użytkownika
+        function loadFromFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const csvText = e.target.result;
+                parseCSVData(csvText);
+            };
+            reader.onerror = function() {
+                alert('❌ Błąd wczytywania pliku!');
+            };
+            reader.readAsText(file);
+        }
+
+        // Parsowanie danych CSV
+        function parseCSVData(csvText) {
+            Papa.parse(csvText, {
+                header: true,
+                skipEmptyLines: true,
+                dynamicTyping: false,
+                encoding: 'UTF-8',
+                complete: function(results) {
+                    console.log('Parsed results:', results);
+                    console.log('First row:', results.data[0]);
+
+                    // Sprawdź jakie są nazwy kolumn
+                    if (results.data.length > 0) {
+                        console.log('Column names:', Object.keys(results.data[0]));
+                    }
+
+                    productionData = results.data.map(row => {
+                        // Pobierz nazwę kolumny - wspiera różne formaty
+                        const dateValue = row['time'] || row['Time'] || row['Zaktualizowany czas'] || row['data'] || '';
+                        const productionValue = row['daily-production'] || row['Daily-Production'] || row['Produkcja-dziś(kWh)'] || row['produkcja'] || '0';
+
+                        return {
+                            date: String(dateValue).trim(),
+                            production: parseFloat(productionValue) || 0
+                        };
+                    });
+
+                    console.log('Mapped data (first 3):', productionData.slice(0, 3));
+
+                    // Filtrowanie pustych wierszy - akceptuj również 0
+                    productionData = productionData.filter(d => d.date && d.date.length > 0 && !isNaN(d.production));
+
+                    console.log('Filtered data length:', productionData.length);
+
+                    // Sortowanie po dacie
+                    productionData.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+                    if (productionData.length > 0) {
+                        // Generuj wykresy TYLKO dla rzeczywistych danych z CSV
+                        updateProductionChart();
+                        simulateFullPeriod();
+
+                        const totalProduction = productionData.reduce((sum, d) => sum + d.production, 0);
+                        const avgProduction = totalProduction / productionData.length;
+                        const totalLoss = lossHistory.reduce((sum, d) => sum + d.loss, 0);
+                        const avgLoss = totalLoss / lossHistory.length;
+
+                        const volume = tankShape === 'box'
+                            ? tankLength * tankWidth * tankHeight
+                            : Math.PI * cylinderRadius * cylinderRadius * cylinderHeight;
+
+                        const dimensions = tankShape === 'box'
+                            ? `${tankLength}m × ${tankWidth}m × ${tankHeight}m`
+                            : `⌀${(cylinderRadius*2).toFixed(2)}m × ${cylinderHeight}m (r=${cylinderRadius}m)`;
+
+                        const avgSandPath = tankShape === 'box'
+                            ? (tankLength + tankWidth + tankHeight) / 6
+                            : (cylinderRadius + cylinderHeight / 2) / 2;
+
+                        // Oblicz okres w latach
+                        const startDate = new Date(productionData[0].date);
+                        const endDate = new Date(productionData[productionData.length-1].date);
+                        const periodYears = (endDate - startDate) / (365.25 * 24 * 60 * 60 * 1000);
+
+                        // Oblicz rzeczywistą moc instalacji po przeskalowaniu
+                        const nominalPower = 12; // kW (z pliku)
+                        const scaledPower = nominalPower * (pvScaling / 100);
+
+                        alert(`✅ Wczytano ${productionData.length} dni danych produkcji energii!\n\n` +
+                              `Okres: ${productionData[0].date} - ${productionData[productionData.length-1].date}\n` +
+                              `Czas trwania: ${periodYears.toFixed(2)} lat\n\n` +
+                              `Akumulator:\n` +
+                              `Kształt: ${tankShape === 'box' ? 'Prostopadłościan' : 'Walec'}\n` +
+                              `Wymiary: ${dimensions}\n` +
+                              `Objętość: ${volume.toFixed(2)} m³\n` +
+                              `Zakres temperatur: 20-${maxSandTemp}°C\n` +
+                              `Pojemność: ${maxCapacity.toFixed(2)} kWh\n` +
+                              `Śr. droga ciepła przez piasek: ${(avgSandPath*1000).toFixed(0)} mm\n\n` +
+                              `Instalacja PV:\n` +
+                              `Moc nominalna (z pliku): ${nominalPower} kW\n` +
+                              `Skalowanie: ${pvScaling}%\n` +
+                              `Rzeczywista moc: ${scaledPower.toFixed(2)} kW\n\n` +
+                              `Produkcja (z pliku, przed skalowaniem):\n` +
+                              `Średnia dzienna: ${avgProduction.toFixed(2)} kWh/dzień\n` +
+                              `Całkowita: ${totalProduction.toFixed(2)} kWh\n\n` +
+                              `Produkcja (po skalowaniu ${pvScaling}%):\n` +
+                              `Średnia dzienna: ${(avgProduction * pvScaling / 100).toFixed(2)} kWh/dzień\n` +
+                              `Całkowita: ${(totalProduction * pvScaling / 100).toFixed(2)} kWh\n\n` +
+                              `Straty (piasek + izolacja ${insulationThickness}mm):\n` +
+                              `Średnie dzienne: ${avgLoss.toFixed(2)} kWh/dzień\n` +
+                              `Całkowite: ${totalLoss.toFixed(2)} kWh\n\n` +
+                              `Stan końcowy: ${currentStorage.toFixed(2)} kWh (${(currentStorage/maxCapacity*100).toFixed(1)}%)`);
+                    } else {
+                        console.error('No data after filtering. Raw results:', results);
+                        alert('⚠️ Nie znaleziono danych w pliku CSV.\n\n' +
+                              'Sprawdź konsolę przeglądarki (F12) aby zobaczyć szczegóły.');
+                        productionData = [];
+                    }
+                },
+                error: function(error) {
+                    console.error('Błąd parsowania CSV:', error);
+                    alert('❌ Błąd parsowania pliku CSV. Sprawdź format pliku.\n\nSzczegóły w konsoli (F12).');
+                }
+            });
+        }
+
+
+        // Aktualizacja wykresu produkcji
+        function updateProductionChart() {
+            // Pokazuj cały okres z pliku CSV
+            productionChart.data.labels = productionData.map(d => d.date);
+            productionChart.data.datasets[0].data = productionData.map(d => d.production);
+            productionChart.update();
+        }
+
+        // Obliczanie dziennych strat energii przez izolację
+        function calculateDailyLoss(temperature, insulationThicknessMm) {
+            // MODEL FIZYCZNY STRAT CIEPŁA:
+            // Ciepło musi przejść przez dwie warstwy (oporności szeregowo):
+            // 1. PIASEK (wewnątrz zbiornika) - gorsze przewodzenie ciepła
+            // 2. IZOLACJA (na zewnątrz) - lepsze właściwości izolacyjne
+            //
+            // Gradient temperatury w piasku:
+            // - W centrum zbiornika: temperatura maksymalna (podana w parametrze)
+            // - Przy ściankach: temperatura niższa (zależy od oporności piasku)
+            // - Ciepło rozprzestrzenia się od centrum do wszystkich 6 ścian
+            //
+            // Lambda (przewodność cieplna):
+            // - Piasek: 0.27 W/(m·K) - GORSZY izolator (ciepło łatwiej przepływa)
+            // - Wełna: 0.04 W/(m·K) - LEPSZY izolator (ok. 6-7× lepsza niż piasek)
+
+            // Parametry fizyczne
+            const ambientTemp = 20; // Temperatura otoczenia (°C)
+            const lambdaInsulation = 0.04; // Współczynnik przewodzenia ciepła izolacji (W/m·K) - wełna mineralna
+            const lambdaSand = 0.27; // Współczynnik przewodzenia ciepła piasku (W/m·K) - piasek suchy
+
+            // Konwersja grubości z mm na m
+            const thicknessM = insulationThicknessMm / 1000;
+
+            // Obliczanie ŚREDNIEJ DROGI ciepła przez piasek do ścianek
+            // Zależy od kształtu zbiornika
+            let avgSandPath;
+
+            if (tankShape === 'box') {
+                // Prostopadłościan: średnia droga to 1/6 sumy wymiarów
+                avgSandPath = (tankLength + tankWidth + tankHeight) / 6;
+            } else {
+                // Walec: średnia droga = (promień + wysokość/2) / 2
+                avgSandPath = (cylinderRadius + cylinderHeight / 2) / 2;
+            }
+
+            // Dla małych zbiorników droga jest krótsza (mniejszy opór piasku)
+            // Dla dużych zbiorników droga jest dłuższa (większy opór piasku)
+
+            // Wymiary zewnętrzne izolacji - zależą od kształtu
+            // UWAGA: Podstawa ma 4× grubszą izolację (konstrukcyjna)
+            const baseThicknessM = thicknessM * 4;
+
+            let baseArea, wallsArea, topArea;
+            let baseAreaOuter, wallsTopAreaOuter;
+
+            if (tankShape === 'box') {
+                // Prostopadłościan
+                const outerLength = tankLength + 2 * thicknessM;
+                const outerWidth = tankWidth + 2 * thicknessM;
+
+                baseArea = tankLength * tankWidth;
+                wallsArea = 2 * (tankLength * tankHeight + tankWidth * tankHeight);
+                topArea = tankLength * tankWidth;
+
+                baseAreaOuter = outerLength * outerWidth;
+                wallsTopAreaOuter = 2 * (outerLength * outerWidth + outerLength * tankHeight + outerWidth * tankHeight);
+            } else {
+                // Walec
+                const outerRadius = cylinderRadius + thicknessM;
+
+                baseArea = Math.PI * cylinderRadius * cylinderRadius; // Podstawa (koło)
+                wallsArea = 2 * Math.PI * cylinderRadius * cylinderHeight; // Płaszcz boczny
+                topArea = Math.PI * cylinderRadius * cylinderRadius; // Góra (koło)
+
+                baseAreaOuter = Math.PI * (cylinderRadius + baseThicknessM) * (cylinderRadius + baseThicknessM);
+                wallsTopAreaOuter = 2 * Math.PI * outerRadius * cylinderHeight + Math.PI * outerRadius * outerRadius;
+            }
+
+            // Średnie powierzchnie dla przewodzenia (geometryczna średnia wew. i zew.)
+            const avgBaseArea = Math.sqrt(baseArea * baseAreaOuter);
+            const wallsTopAreaInner = wallsArea + topArea;
+            const avgWallsTopArea = Math.sqrt(wallsTopAreaInner * wallsTopAreaOuter);
+
+            // Różnica temperatur
+            const deltaT = temperature - ambientTemp;
+
+            if (deltaT <= 0) {
+                return 0; // Brak strat jeśli temp <= otoczenia
+            }
+
+            // Obliczanie OPORNOŚCI TERMICZNYCH (szeregowo połączone)
+            // R = d / (lambda * A)
+
+            // Oporność termiczna piasku (dla całego zbiornika)
+            const R_sand = avgSandPath / (lambdaSand * (avgBaseArea + avgWallsTopArea));
+
+            // Oporność termiczna izolacji - OSOBNO dla podstawy i ścian
+            // Podstawa: 4× grubsza izolacja (konstrukcyjna)
+            const effectiveBaseThickness = baseThicknessM > 0 ? baseThicknessM : 0.004; // min 4mm
+            const R_insulation_base = effectiveBaseThickness / (lambdaInsulation * avgBaseArea);
+
+            // Ściany i góra: normalna grubość
+            const effectiveThickness = thicknessM > 0 ? thicknessM : 0.001; // min 1mm
+            const R_insulation_walls = effectiveThickness / (lambdaInsulation * avgWallsTopArea);
+
+            // Całkowita oporność termiczna (równoległe połączenie podstawy i ścian)
+            // 1/R_total = 1/R_base + 1/R_walls
+            // gdzie R_base = R_sand + R_insulation_base (szeregowo)
+            // i R_walls = R_sand + R_insulation_walls (szeregowo)
+
+            // Uproszczenie: zakładamy że piasek ma jedną wspólną oporność
+            // a izolacje są równolegle (podstawa || ściany)
+            const R_insulation_parallel = 1 / (1/R_insulation_base + 1/R_insulation_walls);
+            const R_total = R_sand + R_insulation_parallel;
+
+            // Obliczanie strat cieplnych (W)
+            // Q = ΔT / R_total
+            const heatLoss = deltaT / R_total;
+
+            // Konwersja na energię dzienną (kWh)
+            // P[W] * 24h / 1000 = kWh
+            return (heatLoss * 24) / 1000;
+        }
+
+        // Obliczanie średniej temperatury piasku z uwzględnieniem gradientu
+        function calculateAverageSandTemperature(centerTemp) {
+            // MODEL GRADIENTU TEMPERATUR W PIASKU:
+            // W centrum zbiornika: temperatura maksymalna (centerTemp)
+            // Przy ściankach: temperatura niższa (zależy od oporności piasku i izolacji)
+            //
+            // Dla prostopadłościanu zakładamy rozkład paraboliczny temperatury
+            // od centrum do ścianek. Średnia temperatura jest niższa niż w centrum.
+            //
+            // Uproszczony model: T_avg = T_center - (gradient × średnia_droga/2)
+            // gdzie gradient zależy od strat ciepła
+
+            const ambientTemp = 20;
+            const deltaT = centerTemp - ambientTemp;
+
+            if (deltaT <= 0) {
+                return {
+                    center: centerTemp,
+                    average: centerTemp,
+                    wall: centerTemp
+                };
+            }
+
+            // Obliczanie gradientu temperatury w piasku
+            // Im większe straty, tym większy gradient
+            let avgSandPath;
+
+            if (tankShape === 'box') {
+                avgSandPath = (tankLength + tankWidth + tankHeight) / 6;
+            } else {
+                avgSandPath = (cylinderRadius + cylinderHeight / 2) / 2;
+            }
+
+            const thicknessM = insulationThickness / 1000;
+            const baseThicknessM = thicknessM * 4;
+            const lambdaSand = 0.27;
+            const lambdaInsulation = 0.04;
+
+            // Obliczamy powierzchnie - jak w calculateDailyLoss
+            let baseArea, wallsArea, topArea;
+            let baseAreaOuter, wallsTopAreaOuter;
+
+            if (tankShape === 'box') {
+                const outerLength = tankLength + 2 * thicknessM;
+                const outerWidth = tankWidth + 2 * thicknessM;
+
+                baseArea = tankLength * tankWidth;
+                wallsArea = 2 * (tankLength * tankHeight + tankWidth * tankHeight);
+                topArea = tankLength * tankWidth;
+
+                baseAreaOuter = outerLength * outerWidth;
+                wallsTopAreaOuter = 2 * (outerLength * outerWidth + outerLength * tankHeight + outerWidth * tankHeight);
+            } else {
+                const outerRadius = cylinderRadius + thicknessM;
+
+                baseArea = Math.PI * cylinderRadius * cylinderRadius;
+                wallsArea = 2 * Math.PI * cylinderRadius * cylinderHeight;
+                topArea = Math.PI * cylinderRadius * cylinderRadius;
+
+                baseAreaOuter = Math.PI * (cylinderRadius + baseThicknessM) * (cylinderRadius + baseThicknessM);
+                wallsTopAreaOuter = 2 * Math.PI * outerRadius * cylinderHeight + Math.PI * outerRadius * outerRadius;
+            }
+
+            const avgBaseArea = Math.sqrt(baseArea * baseAreaOuter);
+            const wallsTopAreaInner = wallsArea + topArea;
+            const avgWallsTopArea = Math.sqrt(wallsTopAreaInner * wallsTopAreaOuter);
+
+            // Oporności
+            const R_sand = avgSandPath / (lambdaSand * (avgBaseArea + avgWallsTopArea));
+
+            const effectiveBaseThickness = baseThicknessM > 0 ? baseThicknessM : 0.004;
+            const R_insulation_base = effectiveBaseThickness / (lambdaInsulation * avgBaseArea);
+
+            const effectiveThickness = thicknessM > 0 ? thicknessM : 0.001;
+            const R_insulation_walls = effectiveThickness / (lambdaInsulation * avgWallsTopArea);
+
+            const R_insulation_parallel = 1 / (1/R_insulation_base + 1/R_insulation_walls);
+            const R_total = R_sand + R_insulation_parallel;
+
+            // Strumień ciepła
+            const heatFlow = deltaT / R_total; // W
+
+            // Spadek temperatury w warstwie piasku
+            // ΔT_sand = Q × R_sand
+            const tempDropInSand = heatFlow * R_sand;
+
+            // Temperatura przy ściankach wewnętrznych zbiornika (przed izolacją)
+            const wallTemp = centerTemp - tempDropInSand;
+
+            // Średnia temperatura w piasku (rozkład paraboliczny)
+            // Dla rozkładu parabolicznego: T_avg = (2×T_center + T_wall) / 3
+            const avgTemp = (2 * centerTemp + wallTemp) / 3;
+
+            // Zwracamy obiekt z trzema wartościami
+            return {
+                center: centerTemp,
+                average: avgTemp,
+                wall: wallTemp
+            };
+        }
+
+
+        // Symulacja całego okresu
+        function simulateFullPeriod() {
+            storageHistory = [];
+            temperatureHistory = [];
+            lossHistory = [];
+            currentStorage = 0; // Akumulator zaczyna pusty
+            currentTemperature = 20; // Temperatura w centrum zbiornika
+
+            // Współczynnik skalowania (100% = 1.0, 50% = 0.5, 200% = 2.0)
+            const scalingFactor = pvScaling / 100;
+
+            productionData.forEach((dayData) => {
+                // Oblicz straty z poprzedniego dnia
+                const dailyLoss = calculateDailyLoss(currentTemperature, insulationThickness);
+
+                // Odejmij straty od akumulatora
+                currentStorage -= dailyLoss;
+                if (currentStorage < 0) currentStorage = 0;
+
+                // Aktualizacja stanu akumulatora - produkcja przeskalowana
+                const scaledProduction = dayData.production * scalingFactor;
+                currentStorage += scaledProduction;
+
+                // Ograniczenia pojemności
+                if (currentStorage > maxCapacity) {
+                    currentStorage = maxCapacity;
+                } else if (currentStorage < 0) {
+                    currentStorage = 0;
+                }
+
+                // Obliczanie temperatury w centrum na podstawie poziomu naładowania
+                // To jest temperatura MAKSYMALNA (w centrum zbiornika)
+                const storagePercentage = currentStorage / maxCapacity;
+                const minTemp = 20; // Temperatura otoczenia
+                const tempRange = maxSandTemp - minTemp; // Zakres temperatur
+                currentTemperature = minTemp + (storagePercentage * tempRange); // np. 20 + (1.0 × 580) = 600°C
+
+                // Oblicz temperatury w różnych miejscach zbiornika (uwzględnia gradient)
+                const temperatures = calculateAverageSandTemperature(currentTemperature);
+
+                storageHistory.push({
+                    date: dayData.date,
+                    storage: currentStorage
+                });
+
+                // Zapisujemy TRZY temperatury: centrum, średnią i przy ściankach
+                temperatureHistory.push({
+                    date: dayData.date,
+                    temperature: temperatures.center,      // temp. w centrum (max)
+                    avgTemperature: temperatures.average,  // średnia temp. w całym zbiorniku
+                    wallTemperature: temperatures.wall     // temp. przy ściankach (przed izolacją)
+                });
+
+                lossHistory.push({
+                    date: dayData.date,
+                    loss: dailyLoss
+                });
+            });
+
+            updateStorageChart();
+            updateLossChart();
+            updateTemperatureChart();
+            updateDisplay();
+        }
+
+
+        // Aktualizacja wykresu stanu akumulatora
+        function updateStorageChart() {
+            // Pokazuj cały okres
+            storageChart.data.labels = storageHistory.map(d => d.date);
+            storageChart.data.datasets[0].data = storageHistory.map(d => d.storage);
+            storageChart.update();
+        }
+
+        // Aktualizacja wykresu strat energii
+        function updateLossChart() {
+            // Pokazuj cały okres
+            lossChart.data.labels = lossHistory.map(d => d.date);
+            lossChart.data.datasets[0].data = lossHistory.map(d => d.loss);
+            lossChart.update();
+        }
+
+        // Aktualizacja wykresu temperatury
+        function updateTemperatureChart() {
+            // Pokazuj cały okres - temperatura w centrum, średnia i przy ściankach
+            temperatureChart.data.labels = temperatureHistory.map(d => d.date);
+            temperatureChart.data.datasets[0].data = temperatureHistory.map(d => d.temperature); // centrum
+            temperatureChart.data.datasets[1].data = temperatureHistory.map(d => d.avgTemperature); // średnia
+            temperatureChart.data.datasets[2].data = temperatureHistory.map(d => d.wallTemperature); // ścianki
+            temperatureChart.update();
+        }
+
+        // Aktualizacja wyświetlania - minimalna funkcja
+        function updateDisplay() {
+            // Funkcja może być używana w przyszłości
+        }
+    </script>
+</body>
+</html>
+
