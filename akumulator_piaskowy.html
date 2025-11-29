@@ -197,6 +197,11 @@
             </ul>
             <p><strong>💡 Start:</strong> Aplikacja automatycznie wczyta przykładowe dane produkcji (instalacja 10kW). Możesz też kliknąć <strong>"📁 Wybierz plik CSV"</strong> aby wczytać własne dane.</p>
             <p style="margin-top: 10px; font-size: 0.9em;"><strong>📁 Format CSV:</strong> Kolumny <code>time</code> (data) i <code>daily-production</code> (produkcja w kWh).</p>
+            <p style="margin-top: 5px; font-size: 0.9em;"><strong>⏰ Obsługiwane formaty dat:</strong></p>
+            <ul style="margin: 5px 0 10px 20px; line-height: 1.6; font-size: 0.9em;">
+                <li><strong>Jeden wpis dziennie:</strong> <code>2025-07-29</code> lub <code>2025-07-29,10.5</code></li>
+                <li><strong>Wiele wpisów dziennie (z timestampami):</strong> <code>2025-07-29 20:37:03,0.00046</code> - wartości zostaną automatycznie zsumowane per dzień</li>
+            </ul>
             <p style="margin-top: 10px; font-size: 0.9em;"><strong>🔧 Debug:</strong> Jeśli masz problem, otwórz konsolę przeglądarki (F12) aby zobaczyć szczegóły.</p>
         </div>
 
@@ -641,28 +646,87 @@
                         console.log('Column names:', Object.keys(results.data[0]));
                     }
 
-                    productionData = results.data.map(row => {
-                        // Pobierz nazwę kolumny - wspiera różne formaty
-                        const dateValue = row['time'] || row['Time'] || row['Zaktualizowany czas'] || row['data'] || '';
-                        const productionValue = row['daily-production'] || row['Daily-Production'] || row['Produkcja-dziś(kWh)'] || row['produkcja'] || '0';
+                    // Mapowanie danych z pliku CSV
+                    // Założenie: pierwsza kolumna = data, druga kolumna = produkcja kWh
+                    let rawData = results.data.map(row => {
+                        const rowKeys = Object.keys(row);
+
+                        // Pierwsza kolumna to data/czas
+                        const dateKey = rowKeys[0] || '';
+                        // Druga kolumna to produkcja
+                        const productionKey = rowKeys[1] || '';
+
+                        const dateValue = dateKey ? row[dateKey] : '';
+                        const productionValue = productionKey ? row[productionKey] : '0';
 
                         return {
-                            date: String(dateValue).trim(),
+                            dateTime: String(dateValue).trim(),
                             production: parseFloat(productionValue) || 0,
                             hasDate: dateValue && String(dateValue).trim().length > 0
                         };
                     });
 
-                    console.log('Mapped data (first 3):', productionData.slice(0, 3));
+                    console.log('Mapped raw data (first 3):', rawData.slice(0, 3));
 
-                    // Sprawdź czy są wiersze bez daty
-                    const rowsWithoutDate = productionData.filter(d => !d.hasDate).length;
-                    if (rowsWithoutDate > 0) {
-                        console.warn(`⚠️ Znaleziono ${rowsWithoutDate} wierszy bez daty - generuję automatyczne daty!`);
+                    // Filtrowanie pustych wierszy
+                    rawData = rawData.filter(d => !isNaN(d.production));
+
+                    // AGREGACJA PER DZIEŃ: sprawdź czy dane zawierają timestamp (godziny)
+                    // Jeśli tak, agreguj wartości dla tego samego dnia
+                    const dailyAggregated = {};
+                    let hasTimestamps = false;
+                    const rowsWithoutDate = [];
+
+                    rawData.forEach(row => {
+                        if (!row.hasDate || row.dateTime.length === 0) {
+                            // Zbierz wiersze bez daty (będą obsłużone później)
+                            rowsWithoutDate.push(row);
+                            return;
+                        }
+
+                        // Wyciągnij samą datę (bez godziny)
+                        // Format może być: "2025-07-29 20:37:03" lub "2025-07-29"
+                        let dateOnly = row.dateTime.split(' ')[0].trim();
+
+                        // Sprawdź czy jest czas (godzina) w danych
+                        if (row.dateTime.includes(':') || row.dateTime.includes(' ')) {
+                            hasTimestamps = true;
+                        }
+
+                        // Agreguj wartości dla tego samego dnia
+                        if (!dailyAggregated[dateOnly]) {
+                            dailyAggregated[dateOnly] = 0;
+                        }
+                        dailyAggregated[dateOnly] += row.production;
+                    });
+
+                    // Konwersja zagregowanych danych do tablicy
+                    productionData = Object.keys(dailyAggregated).map(date => ({
+                        date: date,
+                        production: dailyAggregated[date],
+                        hasDate: true
+                    }));
+
+                    if (hasTimestamps) {
+                        console.log(`✅ Wykryto format z timestampami - zagregowano ${rawData.length - rowsWithoutDate.length} wpisów do ${productionData.length} dni`);
                     }
 
-                    // Filtrowanie pustych wierszy - akceptuj również 0
-                    productionData = productionData.filter(d => !isNaN(d.production));
+                    console.log('Aggregated data (first 3):', productionData.slice(0, 3));
+
+                    // Sprawdź czy są wiersze bez daty (nie zagregowane)
+                    if (rowsWithoutDate.length > 0) {
+                        console.warn(`⚠️ Znaleziono ${rowsWithoutDate.length} wierszy bez daty - generuję automatyczne daty!`);
+
+                        // Dodaj wiersze bez dat jako osobne dni (produkcja per wiersz)
+                        rowsWithoutDate.forEach(row => {
+                            productionData.push({
+                                date: '',  // Zostanie wygenerowana automatycznie
+                                production: row.production,
+                                hasDate: false
+                            });
+                        });
+                    }
+
 
                     // Generuj automatyczne daty dla wierszy bez daty
                     let autoDateCounter = 0;
@@ -765,12 +829,19 @@
                             : '';
 
                         // Komunikat o wypełnionych brakujących dniach (jeśli były luki)
-                        const missingDaysCount = productionData.length - results.data.filter(r => !isNaN(parseFloat(r['daily-production'] || r['Daily-Production'] || r['Produkcja-dziś(kWh)'] || r['produkcja'] || '0'))).length - autoDateCounter;
+                        const originalDataCount = Object.keys(dailyAggregated).length;
+                        const missingDaysCount = productionData.length - originalDataCount - autoDateCounter;
                         const missingDaysInfo = missingDaysCount > 0
                             ? `\n📅 Uzupełniono ${missingDaysCount} brakujących dni (luki w datach) z produkcją 0 kWh.`
                             : '';
 
-                        alert(`✅ Wczytano ${productionData.length} dni danych produkcji energii!${autoDateInfo}${missingDaysInfo}\n` +
+                        // Informacja o agregacji (jeśli były timestampy)
+                        const aggregatedCount = rawData.length - rowsWithoutDate.length;
+                        const aggregationInfo = hasTimestamps
+                            ? `\n🔄 Wykryto format z timestampami - zagregowano ${aggregatedCount} wpisów do ${Object.keys(dailyAggregated).length} dni.`
+                            : '';
+
+                        alert(`✅ Wczytano ${productionData.length} dni danych produkcji energii!${aggregationInfo}${autoDateInfo}${missingDaysInfo}\n` +
                               `Okres: ${productionData[0].date} - ${productionData[productionData.length-1].date}\n` +
                               `Czas trwania: ${periodYears.toFixed(2)} lat\n\n` +
                               `Akumulator:\n` +

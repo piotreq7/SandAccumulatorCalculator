@@ -13,6 +13,7 @@ Aplikacja webowa do symulacji systemu magazynowania energii termicznej w piasku 
 7. [🎯 Typowe scenariusze](#-typowe-scenariusze-użycia)
 8. [🔧 Rozwiązywanie problemów](#-rozwiązywanie-problemów)
 
+
 ---
 
 ## 🚀 Szybki start - JAK UŻYĆ?
@@ -30,7 +31,7 @@ Możesz od razu zobaczyć wykresy i eksperymentować z parametrami.
 
 Jeśli chcesz użyć danych z Twojej instalacji, przygotuj plik CSV:
 
-**Przykładowy plik `produkcja.csv`:**
+**Format 1: Jeden wpis dziennie (suma dzienna)**
 ```csv
 time,daily-production
 2024-01-01,8.5
@@ -39,13 +40,32 @@ time,daily-production
 2024-01-04,15.2
 ```
 
-**Kolumny (może być dowolna z tych nazw):**
-- Data: `time`, `Time`, `data`
-- Produkcja: `daily-production`, `Daily-Production`, `Produkcja-dziś(kWh)`
+**Format 2: Wiele wpisów dziennie (z timestampami) - NOWOŚĆ! ⏰**
+```csv
+time,daily-production
+2025-07-29 20:37:03,0.00046
+2025-07-29 20:47:02,0.00046
+2025-07-29 20:57:03,0.00046
+2025-07-29 21:07:03,0.00046
+2025-07-30 08:15:22,0.00050
+2025-07-30 08:25:23,0.00052
+2025-07-30 08:35:24,0.00055
+```
+**🔄 Aplikacja automatycznie zagreguje wartości per dzień!**
+- Dla daty `2025-07-29` zsumuje wszystkie 4 wpisy: 0.00046 + 0.00046 + 0.00046 + 0.00046 = 0.00184 kWh
+- Dla daty `2025-07-30` zsumuje 3 wpisy: 0.00050 + 0.00052 + 0.00055 = 0.00157 kWh
+
+**📋 Wymagania formatu CSV:**
+- **Pierwsza kolumna:** data lub data z godziną (nazwa kolumny dowolna)
+- **Druga kolumna:** produkcja w kWh (nazwa kolumny dowolna)
+- **Separator wartości:** przecinek (`,`) lub tabulator (TAB) - automatycznie wykrywany
+- **Separator dziesiętny:** kropka (`.`)
+  - Przykład: `8.5`, `0.00046`, `12.3`
 
 ⚠️ **Uwaga:** 
 - Jeśli w pliku CSV brakuje kolumny z datą lub niektóre wiersze nie mają daty, aplikacja automatycznie wygeneruje daty (dni wstecz od dzisiaj) i wyświetli ostrzeżenie.
 - Jeśli w datach są **luki** (np. jest 2025-01-01, potem 2025-01-05), aplikacja **automatycznie wypełni** brakujące dni (2, 3, 4) z produkcją **0 kWh**.
+- **Format z timestampami:** Jeśli dane zawierają godziny (np. `2025-07-29 20:37:03`), aplikacja automatycznie rozpozna ten format, zsumuje wszystkie wartości dla tego samego dnia i wyświetli komunikat o agregacji.
 
 **Aby wczytać własny plik:** Kliknij przycisk **"📁 Wybierz plik CSV"** w aplikacji.
 
