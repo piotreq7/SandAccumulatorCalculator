@@ -294,7 +294,7 @@
             <div class="control-row">
                 <div class="control-group">
                     <label for="pvScaling">Skalowanie produkcji PV (%):</label>
-                    <input type="number" id="pvScaling" value="100" min="0" max="200" step="1">
+                    <input type="number" id="pvScaling" value="100" min="0" step="10">
                     <small style="display: block; color: #666; margin-top: 5px;">100% = pełna produkcja z pliku. 50% = połowa produkcji.</small>
                 </div>
             </div>
@@ -317,18 +317,21 @@
             </div>
 
             <div class="chart-wrapper">
-                <h3 class="chart-title">📉 Straty energii przez izolację - cały okres</h3>
-                <canvas id="lossChart"></canvas>
-            </div>
-
-            <div class="chart-wrapper">
                 <h3 class="chart-title">🌡️ Temperatura piasku (centrum, średnia, ścianki) - cały okres</h3>
                 <canvas id="temperatureChart"></canvas>
             </div>
 
             <div class="chart-wrapper">
                 <h3 class="chart-title">📈 Produkcja energii dzienna - cały okres</h3>
+                <p style="text-align: center; color: #666; font-size: 0.9em; margin-top: -10px; margin-bottom: 10px;">
+                    💡 <strong>Przytrzymaj</strong> przycisk myszy na słupku i <strong>przeciągnij</strong>, aby włączyć/wyłączyć dni produkcji
+                </p>
                 <canvas id="productionChart"></canvas>
+            </div>
+
+            <div class="chart-wrapper">
+                <h3 class="chart-title">📉 Straty energii przez izolację - cały okres</h3>
+                <canvas id="lossChart"></canvas>
             </div>
         </div>
     </div>
@@ -351,6 +354,15 @@
         let insulationThickness = 200; // Grubość izolacji w mm
         let pvScaling = 100; // Skalowanie produkcji PV w % (100% = pełna moc z pliku)
         let maxSandTemp = 600; // Maksymalna temperatura piasku w °C
+
+        // Tablica wyłączonych dni (indeksy dni z productionData)
+        let disabledDays = new Set();
+
+        // Zmienne do obsługi przeciągania po wykresie
+        let isDragging = false;
+        let dragMode = null; // 'enable' lub 'disable'
+        let lastHoveredIndex = -1;
+        let needsSimulationUpdate = false; // Flaga czy trzeba przeliczyć symulację
 
         // Wykresy
         let productionChart, storageChart, lossChart, temperatureChart;
@@ -514,7 +526,115 @@
                         borderWidth: 2
                     }]
                 },
-                options: chartOptions
+                options: {
+                    ...chartOptions,
+                    onHover: (event, activeElements) => {
+                        // Zmień kursor na pointer gdy najeżdżamy na słupek
+                        event.native.target.style.cursor = activeElements.length > 0 ? 'pointer' : 'default';
+
+                        // Jeśli przeciągamy i najeżdżamy na nowy słupek
+                        if (isDragging && activeElements.length > 0) {
+                            const index = activeElements[0].index;
+                            if (index !== lastHoveredIndex) {
+                                lastHoveredIndex = index;
+                                applyDragMode(index);
+                            }
+                        }
+                    },
+                    plugins: {
+                        ...chartOptions.plugins,
+                        tooltip: {
+                            callbacks: {
+                                afterLabel: function(context) {
+                                    const index = context.dataIndex;
+                                    if (disabledDays.has(index)) {
+                                        return '🚫 Wyłączony (przeciągnij aby włączyć)';
+                                    }
+                                    return '✅ Aktywny (przeciągnij aby wyłączyć)';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Event listenery do obsługi przeciągania
+            const productionCanvas = document.getElementById('productionChart');
+
+            // MOUSEDOWN - rozpoczęcie przeciągania
+            productionCanvas.addEventListener('mousedown', (event) => {
+                // Znajdź element pod kursorem
+                const elements = productionChart.getElementsAtEventForMode(
+                    event,
+                    'nearest',
+                    { intersect: true },
+                    false
+                );
+
+                if (elements.length > 0) {
+                    const index = elements[0].index;
+
+                    // Rozpocznij przeciąganie
+                    isDragging = true;
+                    lastHoveredIndex = index;
+
+                    // Ustaw tryb na podstawie aktualnego stanu słupka
+                    dragMode = disabledDays.has(index) ? 'enable' : 'disable';
+
+                    // Zastosuj akcję do pierwszego słupka
+                    applyDragMode(index);
+
+                    console.log(`🖱️ Rozpoczęto przeciąganie - tryb: ${dragMode === 'enable' ? 'włączanie' : 'wyłączanie'}`);
+                }
+            });
+
+            // MOUSEUP - zakończenie przeciągania
+            productionCanvas.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    dragMode = null;
+                    lastHoveredIndex = -1;
+
+                    // Przelicz symulację po zakończeniu przeciągania
+                    if (needsSimulationUpdate) {
+                        simulateFullPeriod();
+                        needsSimulationUpdate = false;
+                    }
+
+                    console.log('🖱️ Zakończono przeciąganie');
+                }
+            });
+
+            // MOUSELEAVE - zakończenie przeciągania gdy mysz opuści wykres
+            productionCanvas.addEventListener('mouseleave', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    dragMode = null;
+                    lastHoveredIndex = -1;
+
+                    // Przelicz symulację po zakończeniu przeciągania
+                    if (needsSimulationUpdate) {
+                        simulateFullPeriod();
+                        needsSimulationUpdate = false;
+                    }
+
+                    console.log('🖱️ Zakończono przeciąganie (mysz opuściła wykres)');
+                }
+            });
+
+            // Globalny listener na wypadek puszczenia przycisku myszy poza wykresem
+            document.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    dragMode = null;
+                    lastHoveredIndex = -1;
+
+                    // Przelicz symulację po zakończeniu przeciągania
+                    if (needsSimulationUpdate) {
+                        simulateFullPeriod();
+                        needsSimulationUpdate = false;
+                    }
+                }
             });
 
             // Wykres stanu akumulatora
@@ -793,6 +913,9 @@
                     }
 
                     if (productionData.length > 0) {
+                        // Resetuj listę wyłączonych dni przy wczytywaniu nowych danych
+                        disabledDays.clear();
+
                         // Generuj wykresy TYLKO dla rzeczywistych danych z CSV
                         updateProductionChart();
                         simulateFullPeriod();
@@ -885,7 +1008,63 @@
             // Pokazuj cały okres z pliku CSV
             productionChart.data.labels = productionData.map(d => d.date);
             productionChart.data.datasets[0].data = productionData.map(d => d.production);
+
+            // Aktualizuj kolory słupków - wyłączone dni mają szary kolor
+            productionChart.data.datasets[0].backgroundColor = productionData.map((d, index) => {
+                return disabledDays.has(index) ? 'rgba(150, 150, 150, 0.4)' : 'rgba(102, 126, 234, 0.6)';
+            });
+            productionChart.data.datasets[0].borderColor = productionData.map((d, index) => {
+                return disabledDays.has(index) ? 'rgba(150, 150, 150, 0.8)' : 'rgba(102, 126, 234, 1)';
+            });
+
             productionChart.update();
+        }
+
+        // Funkcja do przełączania stanu dnia (włączony/wyłączony)
+        function toggleDayDisabled(index) {
+            if (disabledDays.has(index)) {
+                // Włącz dzień
+                disabledDays.delete(index);
+                console.log(`✅ Włączono dzień ${productionData[index].date} (${productionData[index].production.toFixed(2)} kWh)`);
+            } else {
+                // Wyłącz dzień
+                disabledDays.add(index);
+                console.log(`🚫 Wyłączono dzień ${productionData[index].date} (${productionData[index].production.toFixed(2)} kWh)`);
+            }
+
+            // Aktualizuj wykres produkcji (zmiana kolorów)
+            updateProductionChart();
+
+            // Przelicz symulację z nowymi danymi
+            simulateFullPeriod();
+        }
+
+        // Funkcja do aplikowania trybu przeciągania (enable/disable)
+        function applyDragMode(index) {
+            let changed = false;
+
+            if (dragMode === 'disable') {
+                // Wyłączamy - dodaj do zbioru jeśli nie ma
+                if (!disabledDays.has(index)) {
+                    disabledDays.add(index);
+                    console.log(`🚫 Wyłączono dzień ${productionData[index].date} (przeciąganie)`);
+                    changed = true;
+                }
+            } else if (dragMode === 'enable') {
+                // Włączamy - usuń ze zbioru jeśli jest
+                if (disabledDays.has(index)) {
+                    disabledDays.delete(index);
+                    console.log(`✅ Włączono dzień ${productionData[index].date} (przeciąganie)`);
+                    changed = true;
+                }
+            }
+
+            if (changed) {
+                // Tylko update wykresu podczas przeciągania
+                updateProductionChart();
+                // Oznacz że trzeba będzie przeliczyć symulację po zakończeniu
+                needsSimulationUpdate = true;
+            }
         }
 
         // Obliczanie dziennych strat energii przez izolację
@@ -1116,7 +1295,7 @@
             // Współczynnik skalowania (100% = 1.0, 50% = 0.5, 200% = 2.0)
             const scalingFactor = pvScaling / 100;
 
-            productionData.forEach((dayData) => {
+            productionData.forEach((dayData, index) => {
                 // Oblicz straty z poprzedniego dnia
                 const dailyLoss = calculateDailyLoss(currentTemperature, insulationThickness);
 
@@ -1125,7 +1304,9 @@
                 if (currentStorage < 0) currentStorage = 0;
 
                 // Aktualizacja stanu akumulatora - produkcja przeskalowana
-                const scaledProduction = dayData.production * scalingFactor;
+                // JEŚLI dzień jest wyłączony, to produkcja = 0
+                const effectiveProduction = disabledDays.has(index) ? 0 : dayData.production;
+                const scaledProduction = effectiveProduction * scalingFactor;
                 currentStorage += scaledProduction;
 
                 // Ograniczenia pojemności

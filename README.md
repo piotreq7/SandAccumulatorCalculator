@@ -101,8 +101,9 @@ time,daily-production
 
 #### 3.5 Skalowanie produkcji PV (opcjonalnie):
 - **100%** - pełna produkcja z pliku CSV
-- **50%** - symulacja połowy mocy (np. dla instalacji 6 kW zamiast 12 kW)
-- **150%** - symulacja większej instalacji
+- **50%** - symulacja połowy mocy (np. dla instalacji 5 kW zamiast 10 kW)
+- **200%** - symulacja dwukrotnie większej instalacji (20 kW zamiast 10 kW)
+- **300%, 500%, 1000%** - dowolna wartość, krok co 10%
 
 ### Krok 4: Analizuj wykresy
 
@@ -113,20 +114,31 @@ Dane przykładowe zostały już wczytane automatycznie! Możesz od razu analizow
 - Czy zbiornik się przepełnia?
 - Czy wystarczy pojemność?
 
-📉 **2. Straty energii (kWh/dzień)**
-- Ile energii ucieka przez izolację każdego dnia
-- Im wyższe słupki, tym gorsze magazynowanie
-- Zależą od temperatury i grubości izolacji
-
-🌡️ **3. Temperatura piasku (°C)**
+🌡️ **2. Temperatura piasku (°C)**
 - **Pomarańczowa linia** - temperatura w centrum (najgoręcej)
 - **Zielona linia** - średnia temperatura w całym piasku
 - **Niebieska linia** - temperatura przy ściankach (najzimniej)
 - Im większe odstępy między liniami = większe straty
 
-📈 **4. Produkcja energii (kWh)**
-- Twoje dane wejściowe z pliku CSV
-- Dla porównania z stanem akumulatora
+📊 **3. Produkcja energii dzienna - cały okres**
+- Pokazuje produkcję PV z każdego dnia
+- **💡 INTERAKTYWNY:** 
+  - **Wciśnij** przycisk myszy na słupku → rozpoczyna się proces włączania/wyłączania
+  - **Przeciągnij** myszką po innych słupkach (przytrzymując przycisk) → wszystkie zaznaczone słupki zmieniają stan
+    - Pierwszy wciśnięty słupek określa tryb:
+      - Niebieski słupek → tryb **wyłączania** (wszystkie zaznaczone staną się szare)
+      - Szary słupek → tryb **włączania** (wszystkie zaznaczone staną się niebieskie)
+  - **Puść** przycisk myszy → kończy się proces i symulacja automatycznie przelicza się
+  - Wyłączone dni są pokazane na **szaro** 🔲
+  - Aktywne dni są **niebieskie** 🔵
+- Użyj tej funkcji do testowania scenariuszy "co by było gdyby..."
+
+📉 **4. Straty energii (kWh/dzień)**
+- Ile energii ucieka przez izolację każdego dnia
+- Im wyższe słupki, tym gorsze magazynowanie
+- Zależą od temperatury i grubości izolacji
+
+
 
 ### Krok 5: Eksperymentuj!
 
