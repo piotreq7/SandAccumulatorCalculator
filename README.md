@@ -22,8 +22,13 @@ Aplikacja webowa do symulacji systemu magazynowania energii termicznej w piasku 
 Otwórz plik akumulator_piaskowy.html w przeglądarce (Chrome, Firefox, Edge)
 ```
 
-### Krok 2: Przygotuj plik CSV z danymi produkcji
-Potrzebujesz pliku CSV z danymi z Twojej instalacji fotowoltaicznej. Plik musi zawierać kolumny:
+**✨ Aplikacja automatycznie wczyta przykładowe dane produkcji z instalacji 10kW!**
+
+Możesz od razu zobaczyć wykresy i eksperymentować z parametrami.
+
+### Krok 2: (Opcjonalnie) Użyj własnych danych
+
+Jeśli chcesz użyć danych z Twojej instalacji, przygotuj plik CSV:
 
 **Przykładowy plik `produkcja.csv`:**
 ```csv
@@ -37,6 +42,8 @@ time,daily-production
 **Kolumny (może być dowolna z tych nazw):**
 - Data: `time`, `Time`, `data`
 - Produkcja: `daily-production`, `Daily-Production`, `Produkcja-dziś(kWh)`
+
+**Aby wczytać własny plik:** Kliknij przycisk **"📁 Wybierz plik CSV"** w aplikacji.
 
 ### Krok 3: Skonfiguruj zbiornik
 
@@ -73,14 +80,9 @@ time,daily-production
 - **50%** - symulacja połowy mocy (np. dla instalacji 6 kW zamiast 12 kW)
 - **150%** - symulacja większej instalacji
 
-### Krok 4: Wczytaj dane
-1. Kliknij przycisk **"📁 Wybierz plik CSV"**
-2. Wybierz swój plik z danymi produkcji
-3. ✅ Poczekaj na komunikat z podsumowaniem
+### Krok 4: Analizuj wykresy
 
-### Krok 5: Analizuj wykresy
-
-Po wczytaniu danych zobaczysz **4 wykresy**:
+Dane przykładowe zostały już wczytane automatycznie! Możesz od razu analizować **4 wykresy**:
 
 📊 **1. Stan akumulatora (kWh)**
 - Pokazuje ile energii jest zmagazynowane w każdym dniu
@@ -102,7 +104,7 @@ Po wczytaniu danych zobaczysz **4 wykresy**:
 - Twoje dane wejściowe z pliku CSV
 - Dla porównania z stanem akumulatora
 
-### Krok 6: Eksperymentuj!
+### Krok 5: Eksperymentuj!
 
 Zmień parametry i zobacz różnice:
 - ✏️ Zwiększ izolację → mniejsze straty
@@ -324,15 +326,19 @@ Aplikacja wyświetla:
 **Odpowiedź:** Podstawa musi wytrzymać ciężar piasku (~1600 kg/m³). Dlatego używa się materiałów konstrukcyjnych (np. bloczki betonowe wypełnione izolacją) - stąd 4× większa grubość.
 
 ### ❓ Czy mogę użyć własnych danych z mojej instalacji PV?
-**Odpowiedź:** TAK! Wyeksportuj dane do CSV z dwoma kolumnami:
-- Data (time)
-- Produkcja dzienna (daily-production) w kWh
+**Odpowiedź:** TAK! 
+- Aplikacja domyślnie wczytuje przykładowe dane (10kW)
+- Aby użyć swoich danych: wyeksportuj dane do CSV z dwoma kolumnami:
+  - Data (time)
+  - Produkcja dzienna (daily-production) w kWh
+- Kliknij przycisk **"📁 Wybierz plik CSV"** i wybierz swój plik
 
-### ❓ Co zrobić jeśli nie mam pliku CSV?
-**Odpowiedź:** Musisz najpierw przygotować plik z danymi produkcji. Możesz:
-- Pobrać dane z inwentera/falownika
-- Użyć danych z systemu monitoringu (np. SolarEdge, Fronius)
-- Stworzyć testowy plik CSV ręcznie
+### ❓ Skąd pochodzą automatycznie wczytywane dane?
+**Odpowiedź:** 
+- Z repozytorium GitHub: `daily stats 10kw.csv`
+- To rzeczywiste dane z instalacji fotowoltaicznej 10kW
+- Służą jako przykład do eksperymentowania z kalkulatorem
+- Możesz je zastąpić swoimi danymi w dowolnej chwili
 
 ## 📊 Przykłady praktyczne
 

@@ -195,8 +195,9 @@
                 <li>Gradient temperatury w piasku (centrum → ścianki)</li>
                 <li><strong>Skalowanie produkcji PV</strong> (100% = pełna moc z pliku, 50% = połowa produkcji)</li>
             </ul>
-            <p><strong>💡 Aby rozpocząć:</strong> Kliknij przycisk <strong>"📁 Wybierz plik CSV"</strong> i wybierz plik z danymi produkcji energii. Plik powinien mieć kolumny: <code>time</code> (data) i <code>daily-production</code> (produkcja w kWh).</p>
-            <p style="margin-top: 10px; font-size: 0.9em;"><strong>🔧 Debug:</strong> Jeśli masz problem z wczytaniem, otwórz konsolę przeglądarki (F12) aby zobaczyć szczegóły parsowania.</p>
+            <p><strong>💡 Start:</strong> Aplikacja automatycznie wczyta przykładowe dane produkcji (instalacja 10kW). Możesz też kliknąć <strong>"📁 Wybierz plik CSV"</strong> aby wczytać własne dane.</p>
+            <p style="margin-top: 10px; font-size: 0.9em;"><strong>📁 Format CSV:</strong> Kolumny <code>time</code> (data) i <code>daily-production</code> (produkcja w kWh).</p>
+            <p style="margin-top: 10px; font-size: 0.9em;"><strong>🔧 Debug:</strong> Jeśli masz problem, otwórz konsolę przeglądarki (F12) aby zobaczyć szczegóły.</p>
         </div>
 
         <div class="info-box" style="background: #fff3e0; border-left-color: #ff9800;">
@@ -300,7 +301,7 @@
             </div>
             <input type="file" id="fileInput" accept=".csv" style="display: none;" onchange="loadFromFile(event)">
             <p style="margin-top: 10px; color: #666; font-size: 0.9em;">
-                💡 <strong>Wskazówka:</strong> Użyj przycisku "📁 Wybierz plik CSV" aby wczytać dane z pliku
+                💡 <strong>Wskazówka:</strong> Przykładowe dane (10kW) wczytają się automatycznie. Użyj przycisku aby wczytać własny plik CSV.
             </p>
         </div>
 
@@ -354,7 +355,9 @@
             initCharts();
             calculateCapacity(); // Oblicz pojemność na starcie
             updateDisplay();
-            // Nie wczytujemy automatycznie - użytkownik musi wybrać plik CSV
+
+            // Automatyczne wczytanie pliku CSV z GitHuba
+            loadDefaultCSV();
 
             // Event listener dla wyboru kształtu
             document.getElementById('tankShape').addEventListener('change', function(e) {
@@ -583,6 +586,28 @@
             });
         }
 
+        // Automatyczne wczytanie domyślnego pliku CSV z GitHuba
+        function loadDefaultCSV() {
+            const defaultURL = 'https://raw.githubusercontent.com/piotreq7/SandAccumulatorCalculator/main/daily%20stats%2010kw.csv';
+
+            console.log('Wczytywanie domyślnego pliku CSV z:', defaultURL);
+
+            fetch(defaultURL)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Nie można pobrać pliku CSV z GitHuba');
+                    }
+                    return response.text();
+                })
+                .then(csvText => {
+                    console.log('✅ Pomyślnie pobrano plik CSV z GitHuba');
+                    parseCSVData(csvText);
+                })
+                .catch(error => {
+                    console.error('❌ Błąd wczytywania domyślnego pliku CSV:', error);
+                    console.log('💡 Użytkownik może wczytać plik ręcznie za pomocą przycisku "Wybierz plik CSV"');
+                });
+        }
 
         // Wczytanie pliku z dysku użytkownika
         function loadFromFile(event) {
